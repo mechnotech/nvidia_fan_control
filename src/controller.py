@@ -2,6 +2,7 @@ import csv
 import io
 import json
 import logging
+import os
 import subprocess
 import time
 from pathlib import Path
@@ -46,7 +47,12 @@ class FanController:
             f.write(json.dumps({'status': status}))
 
     def check_is_run(self):
-        with open(self.profile_path + 'is_run.json', 'r') as f:
+        path = self.profile_path + 'is_run.json'
+        if not os.path.isfile(path):
+            self.mark_status(status=1)
+            return
+
+        with open(path, 'r') as f:
             result = json.loads(f.read())
             if result['status']:
                 self.logger.warning('Fan Controller already started!')
