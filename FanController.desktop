@@ -1,0 +1,8 @@
+[Desktop Entry]
+Version=1.0
+Name=FanController
+Comment=Python script for control nvidia CPUs fun speed
+Exec=python3 { path to } nvidia_fan_control/src/main.py
+Terminal=false
+Type=Application
+Categories=Application;

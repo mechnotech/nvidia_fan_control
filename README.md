@@ -18,15 +18,43 @@ like this:
 
 ![myplot.png](misc%2Fmyplot.png)
 
-```python
-curve_nodes = {
-    0: 5,
-    20: 15,
-    40: 35,
-    60: 75,
-    80: 95,
-    100: 100,
-}
+## Fast start
+
+Edit the temp_profile.json in profiles
+
+```JSON
+{ "GPUS": [
+  {"0": 5, "20":  15, "40":  35, "60":  75, "80": 95, "100":  100}
+],
+  "GPU_FAN_MAP": {"0": 1, "1": 0}
+        }
 ```
 
-Where key is the GPU temperature and value is the desired fan speed.
+"GPUS":
+
+The key is the GPU temperature and value is the desired fan speed.
+
+"GPU_FAN_MAP":
+
+The key is the GPU number (id) and the value is the fan ID (this works for me, maybe yours will be different)
+
+Create virtual environment:
+
+`git clone `
+
+`python3 -m venv venv`
+
+`source venv/bin/activate`
+
+Install libs:
+
+`pip install -r requirements.txt`
+
+Start the controller:
+
+`python3 src/main.py`
+
+### Run as .desktop application
+
+Edit the path to the script in [FanController.desktop](FanController.desktop).
+Copy to desktop and change file properties to allow execution.
