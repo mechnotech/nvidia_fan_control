@@ -2,7 +2,6 @@ import csv
 import io
 import json
 import logging
-import os
 import subprocess
 import time
 from pathlib import Path
@@ -22,7 +21,6 @@ class FanController:
         self.temp_fan = None
         self.gpu_fan_map = None
         self.profile_path = f'{base_dir}/profiles/'
-        self.check_is_run()
         self.load_profile()
         self.calc_curve()
 
@@ -41,23 +39,6 @@ class FanController:
         new_y = interp1d(x, y, kind='linear')(new_x)
 
         self.temp_fan = dict([(k, v) for k, v in zip(np.array(new_x).astype(int), np.array(new_y).astype(int))])
-
-    def mark_status(self, status: int):
-        with open(self.profile_path + 'is_run.json', 'w') as f:
-            f.write(json.dumps({'status': status}))
-
-    def check_is_run(self):
-        path = self.profile_path + 'is_run.json'
-        if not os.path.isfile(path):
-            self.mark_status(status=1)
-            return
-
-        with open(path, 'r') as f:
-            result = json.loads(f.read())
-            if result['status']:
-                self.logger.warning('Fan Controller already started!')
-                exit()
-        self.mark_status(status=1)
 
     @staticmethod
     def switch_control(gpus: list, defaults: bool = True):
@@ -126,5 +107,4 @@ class FanController:
                 log_cnt += 1
 
         finally:
-            self.mark_status(status=0)
             self.switch_control(gpus)
