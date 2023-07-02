@@ -10,6 +10,7 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 base_dir = Path(__file__).parent.parent.absolute()
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 
 class FanController:
@@ -85,7 +86,7 @@ class FanController:
         try:
             gpus = self.check_gpus()
             if not gpus:
-                print('Nvidia GPUs not detected! (check nvidia-smi')
+                self.logger.error('Nvidia GPUs not detected! (check nvidia-smi)')
                 exit()
             self.switch_control(gpus, defaults=False)
             while True:
@@ -100,10 +101,10 @@ class FanController:
                     old_speed_set[num] = speed
                     self.set_fan_speed(num, speed)
                 if log_cnt % 10 == 0:
-                    print(
-                        'temperature:', *[f'gpu-{n}: {x}' for n, x in enumerate(current_temps)],
-                        'fan speed:', *[f'gpu-{k}: {v}' for k, v in old_speed_set.items()]
-                    )
+                    c_temp = [f'gpu-{n}: {x}' for n, x in enumerate(current_temps)]
+                    c_speed = [f'gpu-{k}: {v}' for k, v in old_speed_set.items()]
+                    self.logger.info(f'temperature - {c_temp}')
+                    self.logger.info(f'fan speed - {c_speed}')
                 log_cnt += 1
 
         finally:
