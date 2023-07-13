@@ -8,4 +8,4 @@ f = NamedTemporaryFile(prefix='lock_fun_controller_010_', delete=True) if not [
 ] else exit('Already running!')
 
 if __name__ == '__main__':
-    FanController().run()
+    FanController(temp=f).run()

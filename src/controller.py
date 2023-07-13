@@ -2,6 +2,7 @@ import csv
 import io
 import json
 import logging
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -16,7 +17,11 @@ logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s %(levelnam
 class FanController:
     logger = logging.getLogger('fan controller')
 
-    def __init__(self):
+    def __init__(self, temp):
+        self.gpus = None
+        self.temp = temp
+        signal.signal(signal.SIGINT, self.close_app)
+        signal.signal(signal.SIGTERM, self.close_app)
         self.gpu_fan_map = None
         self.temp_profile = None
         self.temp_fan = None
@@ -41,13 +46,18 @@ class FanController:
 
         self.temp_fan = dict([(k, v) for k, v in zip(np.array(new_x).astype(int), np.array(new_y).astype(int))])
 
-    @staticmethod
-    def switch_control(gpus: list, defaults: bool = True):
+    def switch_control(self, defaults: bool = True):
         state = 0 if defaults else 1
-        for num in range(len(gpus) - 1):
+        for num in range(len(self.gpus) - 1):
             subprocess.run(
                 ['nvidia-settings', '-a', f'[gpu:{num}]/GPUFanControlState={state}']
             )
+        if not state:
+            self.logger.info('Switched to defaults')
+
+    def close_app(self, *args):
+        self.temp.close()
+        self.switch_control()
 
     def check_gpus(self):
         result = subprocess.run(['nvidia-smi', '-L'], check=True, stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
@@ -80,15 +90,14 @@ class FanController:
         )
 
     def run(self):
-        gpus = []
         old_speed_set = dict()
         log_cnt = 1
         try:
-            gpus = self.check_gpus()
-            if not gpus:
+            self.gpus = self.check_gpus()
+            if not self.gpus:
                 self.logger.error('Nvidia GPUs not detected! (check nvidia-smi)')
                 exit()
-            self.switch_control(gpus, defaults=False)
+            self.switch_control(defaults=False)
             while True:
                 time.sleep(1)
                 current_temps = self.get_current_temp()
@@ -108,4 +117,4 @@ class FanController:
                 log_cnt += 1
 
         finally:
-            self.switch_control(gpus)
+            self.switch_control()
