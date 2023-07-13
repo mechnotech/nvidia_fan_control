@@ -2,6 +2,7 @@ import csv
 import io
 import json
 import logging
+import signal
 import subprocess
 import time
 from pathlib import Path
@@ -10,18 +11,22 @@ import numpy as np
 from scipy.interpolate import interp1d
 
 base_dir = Path(__file__).parent.parent.absolute()
+logging.basicConfig(level=logging.DEBUG, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 
 class FanController:
     logger = logging.getLogger('fan controller')
 
-    def __init__(self):
+    def __init__(self, temp):
+        self.gpus = None
+        self.temp = temp
+        signal.signal(signal.SIGINT, self.close_app)
+        signal.signal(signal.SIGTERM, self.close_app)
         self.gpu_fan_map = None
         self.temp_profile = None
         self.temp_fan = None
         self.gpu_fan_map = None
         self.profile_path = f'{base_dir}/profiles/'
-        self.check_is_run()
         self.load_profile()
         self.calc_curve()
 
@@ -41,25 +46,18 @@ class FanController:
 
         self.temp_fan = dict([(k, v) for k, v in zip(np.array(new_x).astype(int), np.array(new_y).astype(int))])
 
-    def mark_status(self, status: int):
-        with open(self.profile_path + 'is_run.json', 'w') as f:
-            f.write(json.dumps({'status': status}))
-
-    def check_is_run(self):
-        with open(self.profile_path + 'is_run.json', 'r') as f:
-            result = json.loads(f.read())
-            if result['status']:
-                self.logger.warning('Fan Controller already started!')
-                exit()
-        self.mark_status(status=1)
-
-    @staticmethod
-    def switch_control(gpus: list, defaults: bool = True):
+    def switch_control(self, defaults: bool = True):
         state = 0 if defaults else 1
-        for num in range(len(gpus) - 1):
+        for num in range(len(self.gpus) - 1):
             subprocess.run(
                 ['nvidia-settings', '-a', f'[gpu:{num}]/GPUFanControlState={state}']
             )
+        if not state:
+            self.logger.info('Switched to defaults')
+
+    def close_app(self, *args):
+        self.temp.close()
+        self.switch_control()
 
     def check_gpus(self):
         result = subprocess.run(['nvidia-smi', '-L'], check=True, stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
@@ -92,15 +90,14 @@ class FanController:
         )
 
     def run(self):
-        gpus = []
         old_speed_set = dict()
         log_cnt = 1
         try:
-            gpus = self.check_gpus()
-            if not gpus:
-                print('Nvidia GPUs not detected! (check nvidia-smi')
+            self.gpus = self.check_gpus()
+            if not self.gpus:
+                self.logger.error('Nvidia GPUs not detected! (check nvidia-smi)')
                 exit()
-            self.switch_control(gpus, defaults=False)
+            self.switch_control(defaults=False)
             while True:
                 time.sleep(1)
                 current_temps = self.get_current_temp()
@@ -113,12 +110,11 @@ class FanController:
                     old_speed_set[num] = speed
                     self.set_fan_speed(num, speed)
                 if log_cnt % 10 == 0:
-                    print(
-                        'temperature:', *[f'gpu-{n}: {x}' for n, x in enumerate(current_temps)],
-                        'fan speed:', *[f'gpu-{k}: {v}' for k, v in old_speed_set.items()]
-                    )
+                    c_temp = [f'gpu-{n}: {x}' for n, x in enumerate(current_temps)]
+                    c_speed = [f'gpu-{k}: {v}' for k, v in old_speed_set.items()]
+                    self.logger.info(f'temperature - {c_temp}')
+                    self.logger.info(f'fan speed - {c_speed}')
                 log_cnt += 1
 
         finally:
-            self.mark_status(status=0)
-            self.switch_control(gpus)
+            self.switch_control()
