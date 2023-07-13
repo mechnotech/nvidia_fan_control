@@ -117,4 +117,4 @@ class FanController:
                 log_cnt += 1
 
         finally:
-            self.switch_control()
+            self.close_app()
