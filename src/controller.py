@@ -1,9 +1,7 @@
-import csv
-import io
 import json
 import logging
+import os
 import signal
-import subprocess
 import time
 from pathlib import Path
 
@@ -49,9 +47,7 @@ class FanController:
     def switch_control(self, defaults: bool = True):
         state = 0 if defaults else 1
         for num in range(len(self.gpus) - 1):
-            subprocess.run(
-                ['nvidia-settings', '-a', f'[gpu:{num}]/GPUFanControlState={state}']
-            )
+            os.system(f'nvidia-settings -a [gpu:{num}]/GPUFanControlState={state}')
         if not state:
             self.logger.info('Switched to defaults')
 
@@ -60,34 +56,24 @@ class FanController:
         self.switch_control()
 
     def check_gpus(self):
-        result = subprocess.run(['nvidia-smi', '-L'], check=True, stderr=subprocess.DEVNULL, stdout=subprocess.PIPE)
-        if result.stdout:
-            self.logger.info(result.stdout.decode())
-            return result.stdout.split(b'\n')
+        result = os.popen('nvidia-smi -L').read()
+        if result:
+            self.logger.info(result)
+            return result.split('\n')
         return False
 
     @staticmethod
     def get_current_temp():
-        result = []
-        current_temps = subprocess.run(['nvidia-smi', 'stats', '-d', 'temp', '-c', '1'], capture_output=True)
-        with io.StringIO() as stream:
-            stream.write(current_temps.stdout.decode())
-            stream.seek(0)
-            temp_csv = csv.reader(stream)
-            for row in temp_csv:
-                result.append(int(row[-1].strip(' ')))
-        return result
+
+        current_temps = os.popen('nvidia-smi --query-gpu=temperature.gpu --format=csv,noheader').read()
+        output = [int(x) for x in current_temps.split('\n')[:-1]]
+
+        return output
 
     def set_fan_speed(self, gpu_num: int, speed: int):
         self.logger.info(f'try to set gpu: {gpu_num}, speed: {speed}')
         true_fan_num = self.gpu_fan_map[str(gpu_num)]
-        subprocess.run(
-            ['nvidia-settings',
-             '-a',
-             f'[fan:{true_fan_num}]/GPUTargetFanSpeed={speed}'
-             ],
-            capture_output=False, stdout=subprocess.DEVNULL
-        )
+        os.system(f'nvidia-settings -a [fan:{true_fan_num}]/GPUTargetFanSpeed={speed}')
 
     def run(self):
         old_speed_set = dict()
@@ -115,6 +101,7 @@ class FanController:
                     self.logger.info(f'temperature - {c_temp}')
                     self.logger.info(f'fan speed - {c_speed}')
                 log_cnt += 1
-
+        except KeyboardInterrupt:
+            exit()
         finally:
             self.switch_control()
