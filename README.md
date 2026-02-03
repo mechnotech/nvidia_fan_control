@@ -58,3 +58,31 @@ Start the controller:
 
 Edit the path to the script in [FanController.desktop](FanController.desktop).
 Copy to desktop and change file properties to allow execution.
+
+### Run as service (Ubuntu, Debian)
+
+```unit file (systemd)
+[Unit]
+Description=Nvidia Fan Control Service
+After=network.target display-manager.service
+
+[Service]
+Type=simple
+User=root
+Group=root
+Environment=DISPLAY=:0
+Environment=XAUTHORITY=XAUTHORITY=/run/user/1000/gdm/Xauthority
+# your full python path venv !
+ExecStart=/home/user/nvidia_fan_control/venv/bin/python /home/user/nvidia_fan_control/src/main.py
+Restart=always
+RestartSec=10
+
+[Install]
+WantedBy=graphical.target
+```
+
+```bash
+sudo systemctl daemon-reload
+sudo systemctl enable nvidia-fan.service
+sudo service nvidia-fan start
+```
